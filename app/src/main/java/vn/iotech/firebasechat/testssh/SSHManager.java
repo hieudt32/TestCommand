@@ -1,14 +1,23 @@
 package vn.iotech.firebasechat.testssh;
 
+import android.content.Context;
+import android.content.res.AssetManager;
+
 import com.jcraft.jsch.Channel;
 import com.jcraft.jsch.ChannelExec;
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.JSchException;
 import com.jcraft.jsch.Session;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -21,6 +30,7 @@ public class SSHManager {
   private JSch jschSSHChannel;
   private String strUserName;
   private String strConnectionIP;
+  private Context mContext;
   private int intConnectionPort;
   private String strPassword;
   private Session sesConnection;
@@ -28,11 +38,14 @@ public class SSHManager {
   private String privateKeyPath = "//android_asset/id_rsa";
 
   private void doCommonConstructorActions(String userName,
-                                          String password, String connectionIP, String knownHostsFileName) {
+                                          String password, String connectionIP,
+                                          String knownHostsFileName, Context context) {
     jschSSHChannel = new JSch();
     try {
-      jschSSHChannel.addIdentity(getPath());
-
+      String path = copyAsset(mContext.getAssets());
+      if (path != null) {
+        jschSSHChannel.addIdentity(path);
+      }
       jschSSHChannel.setKnownHosts(knownHostsFileName);
     } catch (JSchException jschX) {
       logError(jschX.getMessage());
@@ -41,33 +54,62 @@ public class SSHManager {
     strUserName = userName;
     strPassword = password;
     strConnectionIP = connectionIP;
+
   }
 
-  private String getPath() {
-    File key = new File(privateKeyPath);
+  private String copyAsset(AssetManager assetManager) {
+    File key = new File(mContext.getFilesDir() + "/id_rsa");
+    if (!key.exists()) {
+      InputStream in;
+      OutputStream out;
+      try {
+        in = assetManager.open("id_rsa");
+        out = new FileOutputStream(key);
+        copyFile(in, out);
+        in.close();
+        out.flush();
+        out.close();
+      } catch (Exception e) {
+        e.printStackTrace();
+        return null;
+      }
+    }
     return key.getAbsolutePath();
   }
 
+  private static void copyFile(InputStream in, OutputStream out) throws IOException {
+    byte[] buffer = new byte[1024];
+    int read;
+    while ((read = in.read(buffer)) != -1) {
+      out.write(buffer, 0, read);
+    }
+  }
+
+
   public SSHManager(String userName, String password,
-                    String connectionIP, String knownHostsFileName) {
+                    String connectionIP, String knownHostsFileName, Context context) {
+    mContext = context;
     doCommonConstructorActions(userName, password,
-            connectionIP, knownHostsFileName);
+            connectionIP, knownHostsFileName, context);
     intConnectionPort = 22;
     intTimeOut = 60000;
   }
 
   public SSHManager(String userName, String password, String connectionIP,
-                    String knownHostsFileName, int connectionPort) {
+                    String knownHostsFileName, int connectionPort, Context context) {
+    mContext = context;
     doCommonConstructorActions(userName, password, connectionIP,
-            knownHostsFileName);
+            knownHostsFileName, context);
     intConnectionPort = connectionPort;
     intTimeOut = 60000;
   }
 
   public SSHManager(String userName, String password, String connectionIP,
-                    String knownHostsFileName, int connectionPort, int timeOutMilliseconds) {
+                    String knownHostsFileName, int connectionPort, int timeOutMilliseconds,
+                    Context context) {
+    mContext = context;
     doCommonConstructorActions(userName, password, connectionIP,
-            knownHostsFileName);
+            knownHostsFileName, context);
     intConnectionPort = connectionPort;
     intTimeOut = timeOutMilliseconds;
   }
